@@ -241,7 +241,6 @@
     <div class="notification" id="notification"></div>
 
     <script>
-        // Worker API endpoint
         const API_BASE = 'https://telegram-cdn-worker.mehul-112.workers.dev/api';
         
         let videos = [];
@@ -306,10 +305,20 @@
                 
                 if (data.success) {
                     const player = document.getElementById('videoPlayer');
-                    // FIXED: Use the full streamUrl path directly
-                    player.src = `https://telegram-cdn-worker.mehul-112.workers.dev${data.video.streamUrl}`;
+                    // Construct the full stream URL
+                    const streamUrl = 'https://telegram-cdn-worker.mehul-112.workers.dev' + data.video.streamUrl;
+                    console.log('Stream URL:', streamUrl); // For debugging
+                    
+                    player.src = streamUrl;
                     document.getElementById('videoModal').classList.add('active');
-                    player.play();
+                    
+                    // Wait for video to load before playing
+                    player.onloadedmetadata = () => {
+                        player.play().catch(err => {
+                            console.error('Play error:', err);
+                            showNotification('Failed to play video', 'error');
+                        });
+                    };
                 } else {
                     showNotification('Failed to load video', 'error');
                 }
