@@ -241,7 +241,7 @@
     <div class="notification" id="notification"></div>
 
     <script>
-        // ⚠️ IMPORTANT: Change this to your Worker URL after deployment
+        // Worker API endpoint
         const API_BASE = 'https://telegram-cdn-worker.mehul-112.workers.dev/api';
         
         let videos = [];
@@ -306,7 +306,8 @@
                 
                 if (data.success) {
                     const player = document.getElementById('videoPlayer');
-                    player.src = `${API_BASE.replace('/api', '')}/api/video/${videoId}/stream?signature=${data.video.streamUrl.split('signature=')[1]}`;
+                    // FIXED: Use the full streamUrl path directly
+                    player.src = `https://telegram-cdn-worker.mehul-112.workers.dev${data.video.streamUrl}`;
                     document.getElementById('videoModal').classList.add('active');
                     player.play();
                 } else {
