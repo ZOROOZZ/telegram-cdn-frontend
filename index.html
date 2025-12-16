@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Library</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { text-align: center; color: white; margin-bottom: 40px; }
+        h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        .subtitle { opacity: 0.9; font-size: 1.1rem; }
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+        .upload-section {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 40px;
+        }
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        textarea { resize: vertical; min-height: 80px; }
+        .file-input-label {
+            display: block;
+            padding: 20px;
+            background: #f5f5f5;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .file-input-label:hover {
+            background: #e8e8e8;
+            border-color: #667eea;
+        }
+        .file-input-label.has-file {
+            background: #e8f5e9;
+            border-color: #4caf50;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover:not(:disabled) { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .progress-bar {
+            display: none;
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+        .progress-bar.active { display: block; }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            width: 0%;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+        }
+        .video-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+            cursor: pointer;
+        }
+        .video-card:hover { transform: translateY(-5px); }
+        .video-thumbnail {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .play-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .play-icon::before { content: '▶'; margin-left: 4px; }
+        .video-info { padding: 20px; }
+        .video-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .video-meta { color: #666; font-size: 0.9rem; margin-bottom: 10px; }
+        .btn-delete {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .btn-delete:hover { background: #d32f2f; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content { max-width: 90%; max-height: 90%; position: relative; }
+        .close-btn {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: white;
+            font-size: 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+        video {
+            width: 100%;
+            max-width: 900px;
+            max-height: 80vh;
+            border-radius: 8px;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            z-index: 2000;
+            display: none;
+        }
+        .notification.active { display: block; animation: slideIn 0.3s; }
+        .notification.success { border-left: 4px solid #4caf50; }
+        .notification.error { border-left: 4px solid #f44336; }
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 Video Library</h1>
+            <p class="subtitle">Stream MP4 videos instantly</p>
+            <div class="badge">Powered by Cloudflare + Telegram</div>
+        </header>
+
+        <div class="upload-section">
+            <h2>📤 Upload MP4 Video</h2>
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label>Video Title</label>
+                    <input type="text" id="videoTitle" required placeholder="Enter video title">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="videoDescription" placeholder="Optional description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>MP4 Video File (Max 2GB)</label>
+                    <input type="file" id="videoFile" accept="video/mp4" required style="display:none;">
+                    <label for="videoFile" class="file-input-label" id="fileLabel">
+                        📁 Click to select MP4 video<br>
+                        <small style="opacity: 0.7;">Max 2GB (4GB with Telegram Premium)</small>
+                    </label>
+                </div>
+                <button type="submit" class="btn" id="uploadBtn">Upload Video</button>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </form>
+        </div>
+
+        <div class="video-grid" id="videoGrid"></div>
+
+        <div class="modal" id="videoModal">
+            <button class="close-btn" onclick="closeVideo()">&times;</button>
+            <div class="modal-content">
+                <video id="videoPlayer" controls></video>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        // ⚠️ IMPORTANT: Change this to your Worker URL after deployment
+        const API_BASE = 'https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev/api';
+        
+        let videos = [];
+
+        document.getElementById('videoFile').addEventListener('change', function(e) {
+            const label = document.getElementById('fileLabel');
+            const file = e.target.files[0];
+            if (file) {
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                label.innerHTML = `✅ ${file.name}<br><small>${sizeMB} MB</small>`;
+                label.classList.add('has-file');
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', loadVideos);
+
+        async function loadVideos() {
+            try {
+                const response = await fetch(`${API_BASE}/videos`);
+                const data = await response.json();
+                if (data.success) {
+                    videos = data.videos;
+                    renderVideos();
+                }
+            } catch (error) {
+                console.error('Failed to load videos:', error);
+                showNotification('Failed to load videos', 'error');
+            }
+        }
+
+        function renderVideos() {
+            const grid = document.getElementById('videoGrid');
+            
+            if (videos.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align:center; color:white; padding:60px;">
+                        <h2>No videos yet</h2>
+                        <p>Upload your first MP4 video to get started!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = videos.map(video => `
+                <div class="video-card" onclick="playVideo('${video.id}')">
+                    <div class="video-thumbnail">
+                        <div class="play-icon"></div>
+                    </div>
+                    <div class="video-info">
+                        <div class="video-title">${escapeHtml(video.title)}</div>
+                        <div class="video-meta">${video.views || 0} views</div>
+                        <button class="btn-delete" onclick="deleteVideo(event, '${video.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function playVideo(videoId) {
+            try {
+                const response = await fetch(`${API_BASE}/video/${videoId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const player = document.getElementById('videoPlayer');
+                    player.src = `${API_BASE.replace('/api', '')}/api/video/${videoId}/stream?signature=${data.video.streamUrl.split('signature=')[1]}`;
+                    document.getElementById('videoModal').classList.add('active');
+                    player.play();
+                } else {
+                    showNotification('Failed to load video', 'error');
+                }
+            } catch (error) {
+                console.error('Play error:', error);
+                showNotification('Failed to play video', 'error');
+            }
+        }
+
+        function closeVideo() {
+            const modal = document.getElementById('videoModal');
+            const player = document.getElementById('videoPlayer');
+            player.pause();
+            player.src = '';
+            modal.classList.remove('active');
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const title = document.getElementById('videoTitle').value;
+            const description = document.getElementById('videoDescription').value;
+            const file = document.getElementById('videoFile').files[0];
+            
+            if (!file) {
+                showNotification('Please select a video file', 'error');
+                return;
+            }
+
+            if (!file.type.includes('mp4')) {
+                showNotification('Please select an MP4 file', 'error');
+                return;
+            }
+
+            const maxSize = 2 * 1024 * 1024 * 1024;
+            if (file.size > maxSize) {
+                showNotification('File too large. Max 2GB (4GB with Premium)', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('description', description);
+            formData.append('video', file);
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            progressBar.classList.add('active');
+
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                progressFill.style.width = progress + '%';
+            }, 500);
+
+            try {
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Upload successful!', 'success');
+                    loadVideos();
+                    document.getElementById('uploadForm').reset();
+                    document.getElementById('fileLabel').innerHTML = '📁 Click to select MP4 video<br><small style="opacity: 0.7;">Max 2GB (4GB with Telegram Premium)</small>';
+                    document.getElementById('fileLabel').classList.remove('has-file');
+                    
+                    setTimeout(() => {
+                        progressBar.classList.remove('active');
+                        progressFill.style.width = '0%';
+                    }, 2000);
+                } else {
+                    showNotification('Upload failed: ' + result.error, 'error');
+                }
+            } catch (error) {
+                clearInterval(progressInterval);
+                console.error('Upload error:', error);
+                showNotification('Upload error: ' + error.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Video';
+            }
+        });
+
+        async function deleteVideo(event, videoId) {
+            event.stopPropagation();
+            
+            if (!confirm('Are you sure you want to delete this video?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/video/${videoId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Video deleted', 'success');
+                    loadVideos();
+                } else {
+                    showNotification('Failed to delete', 'error');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                showNotification('Failed to delete video', 'error');
+            }
+        }
+
+        document.getElementById('videoModal').addEventListener('click', (e) => {
+            if (e.target.id === 'videoModal') {
+                closeVideo();
+            }
+        });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} active`;
+            
+            setTimeout(() => {
+                notification.classList.remove('active');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
