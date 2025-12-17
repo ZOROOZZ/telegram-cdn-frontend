@@ -429,6 +429,17 @@
             uploadStartTime = Date.now();
             lastLoaded = 0;
 
+            // Detect large files (>100 MB) and upload directly to MTProto service
+            const isLargeFile = file.size > 100 * 1024 * 1024; // 100 MB
+            const uploadUrl = isLargeFile 
+                ? 'https://telegram-mtproto-service.onrender.com/upload'  // Direct upload for large files
+                : `${API_BASE}/upload`;  // Worker for small files
+            
+            if (isLargeFile) {
+                progressStatus.textContent = 'Uploading large file directly...';
+                console.log('Large file detected, uploading directly to MTProto service');
+            }
+
             // Use XMLHttpRequest for progress tracking
             const xhr = new XMLHttpRequest();
 
@@ -459,18 +470,37 @@
                     uploadSpeed.textContent = `${speedMBps} MB/s`;
                     
                     if (timeRemaining > 0 && timeRemaining < 1000) {
-                        progressStatus.textContent = `Uploading... (~${minutesRemaining}m ${secondsRemaining}s remaining)`;
+                        const status = isLargeFile ? 'Uploading (direct)...' : 'Uploading...';
+                        progressStatus.textContent = `${status} (~${minutesRemaining}m ${secondsRemaining}s remaining)`;
                     } else {
-                        progressStatus.textContent = 'Uploading...';
+                        progressStatus.textContent = isLargeFile ? 'Uploading (direct)...' : 'Uploading...';
                     }
                 }
             });
 
-            xhr.addEventListener('load', () => {
+            xhr.addEventListener('load', async () => {
                 if (xhr.status === 200) {
                     const result = JSON.parse(xhr.responseText);
                     
                     if (result.success) {
+                        // For direct uploads, save metadata to Worker
+                        if (isLargeFile && result.metadata) {
+                            try {
+                                // Save metadata to Cloudflare Worker KV
+                                const saveResponse = await fetch(`${API_BASE}/save-metadata`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(result.metadata)
+                                });
+                                
+                                if (!saveResponse.ok) {
+                                    console.warn('Failed to save metadata to Worker');
+                                }
+                            } catch (e) {
+                                console.warn('Failed to save metadata:', e);
+                            }
+                        }
+                        
                         progressStatus.textContent = '✅ Upload complete!';
                         progressFill.textContent = '100%';
                         showNotification('Upload successful!', 'success');
@@ -503,7 +533,7 @@
                 uploadBtn.textContent = 'Upload Video';
             });
 
-            xhr.open('POST', `${API_BASE}/upload`, true);
+            xhr.open('POST', uploadUrl, true);
             xhr.send(formData);
         });
 
