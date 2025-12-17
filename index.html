@@ -77,22 +77,60 @@
         }
         .btn:hover:not(:disabled) { transform: translateY(-2px); }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .progress-bar {
+        
+        /* NEW: Enhanced Progress Bar */
+        .progress-container {
             display: none;
-            width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 15px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
         }
-        .progress-bar.active { display: block; }
+        .progress-container.active { display: block; }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            transition: width 0.3s;
+            transition: width 0.3s ease;
             width: 0%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
         }
+        
+        .progress-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .upload-speed {
+            color: #667eea;
+            font-weight: 600;
+        }
+        
         .video-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -222,8 +260,20 @@
                     </label>
                 </div>
                 <button type="submit" class="btn" id="uploadBtn">Upload Video</button>
-                <div class="progress-bar" id="progressBar">
-                    <div class="progress-fill" id="progressFill"></div>
+                
+                <!-- NEW: Enhanced Progress Display -->
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-header">
+                        <span id="progressStatus">Uploading...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill">0%</div>
+                    </div>
+                    <div class="progress-stats">
+                        <span id="progressBytes">0 MB / 0 MB</span>
+                        <span class="upload-speed" id="uploadSpeed">0 MB/s</span>
+                    </div>
                 </div>
             </form>
         </div>
@@ -244,6 +294,8 @@
         const API_BASE = 'https://telegram-cdn-worker.mehul-112.workers.dev/api';
         
         let videos = [];
+        let uploadStartTime = 0;
+        let lastLoaded = 0;
 
         document.getElementById('videoFile').addEventListener('change', function(e) {
             const label = document.getElementById('fileLabel');
@@ -305,14 +357,11 @@
                 
                 if (data.success) {
                     const player = document.getElementById('videoPlayer');
-                    // Construct the full stream URL
                     const streamUrl = 'https://telegram-cdn-worker.mehul-112.workers.dev' + data.video.streamUrl;
-                    console.log('Stream URL:', streamUrl); // For debugging
                     
                     player.src = streamUrl;
                     document.getElementById('videoModal').classList.add('active');
                     
-                    // Wait for video to load before playing
                     player.onloadedmetadata = () => {
                         player.play().catch(err => {
                             console.error('Play error:', err);
@@ -336,6 +385,7 @@
             modal.classList.remove('active');
         }
 
+        // NEW: Upload with real-time progress
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -365,53 +415,96 @@
             formData.append('video', file);
 
             const uploadBtn = document.getElementById('uploadBtn');
-            const progressBar = document.getElementById('progressBar');
+            const progressContainer = document.getElementById('progressContainer');
             const progressFill = document.getElementById('progressFill');
+            const progressPercent = document.getElementById('progressPercent');
+            const progressBytes = document.getElementById('progressBytes');
+            const uploadSpeed = document.getElementById('uploadSpeed');
+            const progressStatus = document.getElementById('progressStatus');
 
             uploadBtn.disabled = true;
             uploadBtn.textContent = 'Uploading...';
-            progressBar.classList.add('active');
+            progressContainer.classList.add('active');
+            
+            uploadStartTime = Date.now();
+            lastLoaded = 0;
 
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += Math.random() * 15;
-                if (progress > 90) progress = 90;
-                progressFill.style.width = progress + '%';
-            }, 500);
+            // Use XMLHttpRequest for progress tracking
+            const xhr = new XMLHttpRequest();
 
-            try {
-                const response = await fetch(`${API_BASE}/upload`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                clearInterval(progressInterval);
-                progressFill.style.width = '100%';
-
-                const result = await response.json();
-                
-                if (result.success) {
-                    showNotification('Upload successful!', 'success');
-                    loadVideos();
-                    document.getElementById('uploadForm').reset();
-                    document.getElementById('fileLabel').innerHTML = '📁 Click to select MP4 video<br><small style="opacity: 0.7;">Max 2GB (4GB with Telegram Premium)</small>';
-                    document.getElementById('fileLabel').classList.remove('has-file');
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    const loadedMB = (e.loaded / (1024 * 1024)).toFixed(2);
+                    const totalMB = (e.total / (1024 * 1024)).toFixed(2);
                     
-                    setTimeout(() => {
-                        progressBar.classList.remove('active');
-                        progressFill.style.width = '0%';
-                    }, 2000);
-                } else {
-                    showNotification('Upload failed: ' + result.error, 'error');
+                    // Calculate upload speed
+                    const timeElapsed = (Date.now() - uploadStartTime) / 1000; // seconds
+                    const bytesUploaded = e.loaded - lastLoaded;
+                    const speedMBps = (bytesUploaded / (1024 * 1024) / (timeElapsed || 1)).toFixed(2);
+                    lastLoaded = e.loaded;
+                    uploadStartTime = Date.now();
+                    
+                    // Estimate time remaining
+                    const bytesRemaining = e.total - e.loaded;
+                    const timeRemaining = bytesRemaining / (bytesUploaded / timeElapsed);
+                    const minutesRemaining = Math.floor(timeRemaining / 60);
+                    const secondsRemaining = Math.floor(timeRemaining % 60);
+                    
+                    // Update UI
+                    progressFill.style.width = percentComplete + '%';
+                    progressFill.textContent = percentComplete.toFixed(1) + '%';
+                    progressPercent.textContent = percentComplete.toFixed(1) + '%';
+                    progressBytes.textContent = `${loadedMB} MB / ${totalMB} MB`;
+                    uploadSpeed.textContent = `${speedMBps} MB/s`;
+                    
+                    if (timeRemaining > 0 && timeRemaining < 1000) {
+                        progressStatus.textContent = `Uploading... (~${minutesRemaining}m ${secondsRemaining}s remaining)`;
+                    } else {
+                        progressStatus.textContent = 'Uploading...';
+                    }
                 }
-            } catch (error) {
-                clearInterval(progressInterval);
-                console.error('Upload error:', error);
-                showNotification('Upload error: ' + error.message, 'error');
-            } finally {
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    const result = JSON.parse(xhr.responseText);
+                    
+                    if (result.success) {
+                        progressStatus.textContent = '✅ Upload complete!';
+                        progressFill.textContent = '100%';
+                        showNotification('Upload successful!', 'success');
+                        loadVideos();
+                        document.getElementById('uploadForm').reset();
+                        document.getElementById('fileLabel').innerHTML = '📁 Click to select MP4 video<br><small style="opacity: 0.7;">Max 2GB (4GB with Telegram Premium)</small>';
+                        document.getElementById('fileLabel').classList.remove('has-file');
+                        
+                        setTimeout(() => {
+                            progressContainer.classList.remove('active');
+                            progressFill.style.width = '0%';
+                        }, 3000);
+                    } else {
+                        progressStatus.textContent = '❌ Upload failed';
+                        showNotification('Upload failed: ' + result.error, 'error');
+                    }
+                } else {
+                    progressStatus.textContent = '❌ Upload failed';
+                    showNotification('Upload error: Server error', 'error');
+                }
+                
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = 'Upload Video';
-            }
+            });
+
+            xhr.addEventListener('error', () => {
+                progressStatus.textContent = '❌ Upload failed';
+                showNotification('Upload error: Network error', 'error');
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Video';
+            });
+
+            xhr.open('POST', `${API_BASE}/upload`, true);
+            xhr.send(formData);
         });
 
         async function deleteVideo(event, videoId) {
