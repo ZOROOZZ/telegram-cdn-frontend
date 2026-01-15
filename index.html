@@ -290,7 +290,6 @@
 
     <script>
         const API_BASE = 'https://telegram-cdn-worker.mehul-112.workers.dev/api';
-        const MTPROTO_URL = 'https://mtproto.mehulsaini.xyz';
         const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB chunks
         
         let videos = [];
@@ -345,7 +344,7 @@
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
             
             onProgress(0, 'Initializing session...');
-            const initResponse = await fetch(`${MTPROTO_URL}/upload/init`, {
+            const initResponse = await fetch(`${API_BASE}/upload/init`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: file.name, filesize: file.size, title, description, totalChunks })
@@ -365,7 +364,7 @@
                 formData.append('chunkIndex', i);
                 formData.append('chunk', chunk);
 
-                const chunkResponse = await fetch(`${MTPROTO_URL}/upload/chunk`, { method: 'POST', body: formData });
+                const chunkResponse = await fetch(`${API_BASE}/upload/chunk`, { method: 'POST', body: formData });
                 const chunkData = await chunkResponse.json();
                 if (!chunkData.success) throw new Error(`Chunk ${i} failed`);
 
@@ -374,7 +373,7 @@
             }
 
             onProgress(90, 'Finalizing with Telegram...');
-            const completeResponse = await fetch(`${MTPROTO_URL}/upload/complete`, {
+            const completeResponse = await fetch(`${API_BASE}/upload/complete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionId })
@@ -502,7 +501,7 @@
 
         function resetForm() {
             document.getElementById('uploadForm').reset();
-            document.getElementById('fileLabel').innerHTML = '📁 Click to select MP4 video';
+            document.getElementById('fileLabel').innerHTML = '📁 Click to select MP4 video<br><small style="opacity: 0.7;">Max 2GB (4GB with Telegram Premium)</small>';
             document.getElementById('fileLabel').classList.remove('has-file');
             setTimeout(() => document.getElementById('progressContainer').classList.remove('active'), 3000);
         }
