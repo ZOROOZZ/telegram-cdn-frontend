@@ -290,6 +290,7 @@
 
     <script>
         const API_BASE = 'https://telegram-cdn-worker.mehul-112.workers.dev/api';
+        const UPLOAD_API = 'https://api.mehulsaini.xyz'; // Direct to VPS via Cloudflare
         const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB chunks
         
         let videos = [];
@@ -339,12 +340,12 @@
             `).join('');
         }
 
-        // Logic for Large File Chunked Upload
+        // Logic for Large File Chunked Upload - Direct to VPS
         async function uploadLargeFile(file, title, description, onProgress) {
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
             
             onProgress(0, 'Initializing session...');
-            const initResponse = await fetch(`${API_BASE}/upload/init`, {
+            const initResponse = await fetch(`${UPLOAD_API}/upload/init`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: file.name, filesize: file.size, title, description, totalChunks })
@@ -364,7 +365,7 @@
                 formData.append('chunkIndex', i);
                 formData.append('chunk', chunk);
 
-                const chunkResponse = await fetch(`${API_BASE}/upload/chunk`, { method: 'POST', body: formData });
+                const chunkResponse = await fetch(`${UPLOAD_API}/upload/chunk`, { method: 'POST', body: formData });
                 const chunkData = await chunkResponse.json();
                 if (!chunkData.success) throw new Error(`Chunk ${i} failed`);
 
@@ -373,7 +374,7 @@
             }
 
             onProgress(90, 'Finalizing with Telegram...');
-            const completeResponse = await fetch(`${API_BASE}/upload/complete`, {
+            const completeResponse = await fetch(`${UPLOAD_API}/upload/complete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionId })
@@ -384,7 +385,7 @@
             return completeData;
         }
 
-        // Main Upload Handlerr
+        // Main Upload Handler
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const title = document.getElementById('videoTitle').value;
@@ -414,7 +415,7 @@
                         updateUI(progress, status, loaded, total);
                     });
                 } else {
-                    // Standard XHR for small files
+                    // Standard XHR for small files via Worker
                     result = await new Promise((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
                         const formData = new FormData();
