@@ -382,6 +382,29 @@
             const completeData = await completeResponse.json();
             if (!completeData.success) throw new Error('Finalize failed');
 
+            // If processing in background, poll for completion
+            if (completeData.processing) {
+                onProgress(95, 'Uploading to Telegram...');
+                
+                // Poll every 5 seconds for status
+                const pollStatus = async () => {
+                    const statusResponse = await fetch(`${UPLOAD_API}/upload/status/${sessionId}`);
+                    const statusData = await statusResponse.json();
+                    
+                    if (statusData.processing) {
+                        // Still processing, poll again
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        return pollStatus();
+                    } else if (statusData.success && statusData.metadata) {
+                        return statusData;
+                    } else {
+                        throw new Error(statusData.error || 'Upload failed');
+                    }
+                };
+                
+                return await pollStatus();
+            }
+
             return completeData;
         }
 
